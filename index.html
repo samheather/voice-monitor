@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Input Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: white;
+            transition: background-color 0.2s;
+        }
+        #audio-level {
+            font-size: 8px; /* Smaller font size */
+            margin: 20px;
+        }
+        select {
+            font-size: 1rem;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Audio Input Monitor</h1>
+    <label for="audio-source">Select Audio Source:</label>
+    <select id="audio-source"></select>
+    <div id="audio-level">Current Level: 0.00</div>
+
+    <script>
+        const threshold = 0.05; // Adjust this value as needed for sensitivity
+        let audioContext, analyser, dataArray, microphone;
+        let maxLevel = 0;
+
+        async function setupAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Prompt for microphone access to ensure device labels are available
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                await populateAudioSources();
+
+                const audioSourceSelect = document.getElementById('audio-source');
+                audioSourceSelect.addEventListener('change', () => {
+                    if (microphone) microphone.disconnect();
+                    startMonitoring(audioSourceSelect.value);
+                });
+
+                if (audioSourceSelect.options.length > 0) {
+                    startMonitoring(audioSourceSelect.value);
+                } else {
+                    alert('No audio input devices found.');
+                }
+            } catch (error) {
+                console.error('Error accessing audio devices:', error);
+                alert('Could not access your microphone. Please ensure permissions are granted.');
+            }
+        }
+
+        async function populateAudioSources() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioInputs = devices.filter(device => device.kind === 'audioinput');
+            const audioSourceSelect = document.getElementById('audio-source');
+            audioSourceSelect.innerHTML = ''; // Clear the existing options
+
+            audioInputs.forEach(input => {
+                const option = document.createElement('option');
+                option.value = input.deviceId;
+                option.textContent = input.label || `Microphone ${audioSourceSelect.options.length + 1}`;
+                audioSourceSelect.appendChild(option);
+            });
+
+            if (audioSourceSelect.options.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'No audio input devices available';
+                option.disabled = true;
+                audioSourceSelect.appendChild(option);
+            }
+        }
+
+        async function startMonitoring(deviceId) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { deviceId: deviceId ? { exact: deviceId } : undefined }
+                });
+
+                microphone = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                microphone.connect(analyser);
+
+                monitorAudioLevel();
+                startUpdateLoop();
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+                alert('Could not start monitoring. Please ensure permissions are granted.');
+            }
+        }
+
+        function monitorAudioLevel() {
+            analyser.getByteTimeDomainData(dataArray);
+
+            // Calculate RMS (Root Mean Square) for audio level
+            const rms = Math.sqrt(
+                dataArray.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / dataArray.length
+            );
+
+            maxLevel = Math.max(maxLevel, rms);
+
+            if (rms > threshold) {
+                flashBackground();
+            }
+
+            requestAnimationFrame(monitorAudioLevel);
+        }
+
+        function startUpdateLoop() {
+            setInterval(() => {
+                document.getElementById('audio-level').textContent = `Current Level: ${maxLevel.toFixed(2)}`;
+                maxLevel = 0; // Reset for the next second
+            }, 1000);
+        }
+
+        function flashBackground() {
+            document.body.style.backgroundColor = 'red';
+            setTimeout(() => {
+                document.body.style.backgroundColor = 'white';
+            }, 2000);
+        }
+
+        setupAudio();
+    </script>
+</body>
+</html>
