@@ -23,13 +23,13 @@
     </style>
 </head>
 <body>
-    <h1>Audio Input Monitor</h1>
+    <h1>Audio Input Monitor - configured for webcam</h1>
     <label for="audio-source">Select Audio Source:</label>
     <select id="audio-source"></select>
     <div id="audio-level">Current Level: 0.00</div>
 
     <script>
-        const threshold = 0.08; // Adjust this value as needed for sensitivity
+        const threshold = 0.06; // Adjust this value as needed for sensitivity
         let audioContext, analyser, dataArray, microphone;
         let maxLevel = 0;
 
