@@ -23,7 +23,7 @@
     </style>
 </head>
 <body>
-    <h1>Audio Input Monitor - configured for webcam</h1>
+    <h1>Audio Input Monitor</h1>
     <label for="audio-source">Select Audio Source:</label>
     <select id="audio-source"></select>
     <div id="audio-level">Current Level: 0.00</div>
@@ -31,7 +31,6 @@
     <script>
         const threshold = 0.06; // Adjust this value as needed for sensitivity
         let audioContext, analyser, dataArray, microphone;
-        let maxLevel = 0;
 
         async function setupAudio() {
             try {
@@ -48,8 +47,15 @@
                     startMonitoring(audioSourceSelect.value);
                 });
 
-                if (audioSourceSelect.options.length > 0) {
-                    startMonitoring(audioSourceSelect.value);
+                // Automatically select the audio source containing "Webcam"
+                const webcamOption = Array.from(audioSourceSelect.options).find(option =>
+                    option.textContent.toLowerCase().includes('webcam')
+                );
+                if (webcamOption) {
+                    audioSourceSelect.value = webcamOption.value;
+                    startMonitoring(webcamOption.value);
+                } else if (audioSourceSelect.options.length > 0) {
+                    startMonitoring(audioSourceSelect.value); // Default to the first source
                 } else {
                     alert('No audio input devices found.');
                 }
@@ -110,8 +116,7 @@
                 dataArray.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / dataArray.length
             );
 
-            maxLevel = Math.max(maxLevel, rms);
-
+            document.getElementById('audio-level').textContent = `Current Level: ${rms.toFixed(2)}`;
             if (rms > threshold) {
                 flashBackground();
             }
@@ -120,9 +125,19 @@
         }
 
         function startUpdateLoop() {
+            let maxLevel = 0;
+
             setInterval(() => {
+                analyser.getByteTimeDomainData(dataArray);
+
+                // Calculate RMS (Root Mean Square) for audio level
+                const rms = Math.sqrt(
+                    dataArray.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / dataArray.length
+                );
+
+                maxLevel = Math.max(maxLevel, rms);
                 document.getElementById('audio-level').textContent = `Current Level: ${maxLevel.toFixed(2)}`;
-                maxLevel = 0; // Reset for the next second
+                maxLevel = 0; // Reset max level for the next interval
             }, 1000);
         }
 
