@@ -29,12 +29,23 @@
     <div id="audio-level">Current Level: 0.00</div>
 
     <script>
-        const threshold = 0.06; // Adjust this value as needed for sensitivity
+        const threshold = 0.06; // Adjusted threshold
         let audioContext, analyser, dataArray, microphone;
+        let maxLevel = 0;
+        let breachCount = 0;
 
         async function setupAudio() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Request push notification permission
+                if (Notification.permission === "default") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission !== "granted") {
+                            console.warn("Notifications disabled by user.");
+                        }
+                    });
+                }
 
                 // Prompt for microphone access to ensure device labels are available
                 await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -116,27 +127,29 @@
                 dataArray.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / dataArray.length
             );
 
-            document.getElementById('audio-level').textContent = `Current Level: ${rms.toFixed(2)}`;
-            if (rms > threshold) {
-                flashBackground();
-            }
+            maxLevel = Math.max(maxLevel, rms);
 
             requestAnimationFrame(monitorAudioLevel);
         }
 
         function startUpdateLoop() {
-            let maxLevel = 0;
-
             setInterval(() => {
-                analyser.getByteTimeDomainData(dataArray);
-
-                // Calculate RMS (Root Mean Square) for audio level
-                const rms = Math.sqrt(
-                    dataArray.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / dataArray.length
-                );
-
-                maxLevel = Math.max(maxLevel, rms);
                 document.getElementById('audio-level').textContent = `Current Level: ${maxLevel.toFixed(2)}`;
+
+                // Check if the threshold is breached
+                if (maxLevel > threshold) {
+                    breachCount++;
+                } else {
+                    breachCount = 0; // Reset if no breach
+                }
+
+                // Trigger background flash and notification on 2 consecutive breaches
+                if (breachCount >= 2) {
+                    flashBackground();
+                    sendNotification("Audio Alert", "Threshold exceeded for 2 consecutive seconds!");
+                    breachCount = 0; // Reset after action
+                }
+
                 maxLevel = 0; // Reset max level for the next interval
             }, 1000);
         }
@@ -146,6 +159,14 @@
             setTimeout(() => {
                 document.body.style.backgroundColor = 'white';
             }, 2000);
+        }
+
+        function sendNotification(title, message) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: message });
+            } else {
+                console.warn("Notifications are not enabled.");
+            }
         }
 
         setupAudio();
