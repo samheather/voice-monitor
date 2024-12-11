@@ -20,6 +20,11 @@
             font-size: 1rem;
             padding: 5px;
         }
+        button {
+            margin-top: 20px;
+            padding: 10px 15px;
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -27,6 +32,7 @@
     <label for="audio-source">Select Audio Source:</label>
     <select id="audio-source"></select>
     <div id="audio-level">Current Level: 0.00</div>
+    <button id="enable-notifications">Enable Notifications</button>
 
     <script>
         const threshold = 0.06; // Adjusted threshold
@@ -37,15 +43,6 @@
         async function setupAudio() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-                // Request push notification permission
-                if (Notification.permission === "default") {
-                    Notification.requestPermission().then(permission => {
-                        if (permission !== "granted") {
-                            console.warn("Notifications disabled by user.");
-                        }
-                    });
-                }
 
                 // Prompt for microphone access to ensure device labels are available
                 await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -168,6 +165,16 @@
                 console.warn("Notifications are not enabled.");
             }
         }
+
+        document.getElementById("enable-notifications").addEventListener("click", () => {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    alert("Notifications enabled!");
+                } else {
+                    alert("Notifications not enabled. Notifications won't work.");
+                }
+            });
+        });
 
         setupAudio();
     </script>
